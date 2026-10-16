@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Real-time dashboard for an ATmega328P energy monitor over USB serial or Bluetooth LE.">
+  <meta name="theme-color" content="#0d0d0d" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f9f9f7" media="(prefers-color-scheme: light)">
+  <title>Energy Monitor Dashboard</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232a78d6'/><path d='M18 4 8 18h7l-2 10 10-14h-7z' fill='white'/></svg>">
+  <link rel="stylesheet" href="vendor/uplot/uPlot.min.css">
+  <link rel="stylesheet" href="css/styles.css">
+  <!-- Apply the saved theme before first paint to avoid a flash. -->
+  <script>
+    try {
+      const t = JSON.parse(localStorage.getItem('em-dashboard-settings') || '{}').theme;
+      if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+    } catch {}
+  </script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7"/><path d="M18 4 8 18h7l-2 10 10-14h-7z"/></svg>
+      <div>
+        <h1>Energy Monitor</h1>
+        <p class="subtitle">ATmega328P · live UART telemetry</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div id="status" class="status-pill" data-state="disconnected" role="status" aria-live="polite">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span class="status-text">Disconnected</span>
+      </div>
+      <button id="theme-toggle" class="icon-btn" type="button" aria-label="Toggle light/dark theme" title="Toggle theme">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/></svg>
+      </button>
+      <button id="settings-open" class="icon-btn" type="button" aria-label="Settings" title="Settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <!-- Connection -->
+    <section class="panel connection" aria-label="Connection">
+      <div class="source-picker" role="radiogroup" aria-label="Data source">
+        <label class="seg"><input type="radio" name="source" value="simulated" checked><span>Simulated</span></label>
+        <label class="seg"><input type="radio" name="source" value="serial"><span>USB Serial</span></label>
+        <label class="seg"><input type="radio" name="source" value="bluetooth"><span>Bluetooth</span></label>
+      </div>
+      <button id="connect-btn" class="btn btn-primary" type="button">Connect</button>
+      <p id="connection-message" class="connection-message">Select a data source and press Connect.</p>
+      <p id="support-note" class="support-note" hidden></p>
+    </section>
+
+    <!-- Link quality -->
+    <section class="link-stats" aria-label="Link statistics">
+      <div><span class="k">Records</span> <span id="stat-received" class="v">0</span></div>
+      <div><span class="k">Rejected</span> <span id="stat-rejected" class="v">0</span></div>
+      <div><span class="k">Interval</span> <span id="stat-interval" class="v">—</span></div>
+      <div><span class="k">Last update</span> <span id="stat-age" class="v">—</span></div>
+      <div id="stat-warning" class="stat-warning" hidden></div>
+    </section>
+
+    <!-- Live readings -->
+    <section id="cards" class="cards" aria-label="Live measurements"></section>
+
+    <!-- One control row scoping every chart below -->
+    <section class="toolbar" aria-label="Chart controls">
+      <div class="toolbar-group">
+        <label for="window-select" class="toolbar-label">Window</label>
+        <select id="window-select"></select>
+      </div>
+      <div class="toolbar-group">
+        <button id="pause-btn" class="btn" type="button" aria-pressed="false">Pause</button>
+        <button id="clear-btn" class="btn" type="button">Clear</button>
+        <button id="export-btn" class="btn" type="button">Export CSV</button>
+      </div>
+    </section>
+
+    <!-- Reconstructed waveforms -->
+    <section class="panel waveforms" aria-labelledby="wave-title">
+      <div class="panel-head">
+        <h2 id="wave-title">Waveforms</h2>
+        <span class="badge" title="Calculated from reported values, not sampled from the hardware">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+          Reconstructed · idealised
+        </span>
+      </div>
+      <p class="panel-note">
+        Estimated ideal sinusoids rebuilt from each packet's reported V<sub>RMS</sub>, I<sub>RMS</sub>, power factor
+        and frequency. They are <strong>not</strong> raw samples from the hardware, so harmonics and distortion are not shown.
+        The loads are inductive (RL), so the current lags the voltage by φ = arccos(PF), and the instantaneous
+        power is p(t) = v(t)·i(t). In the combined chart each trace has its own scale, and all three share the same zero line. On the i(t) chart, the dashed lines mark the <em>measured</em> current peak; a gap
+        between it and the ideal peak means the real current is not purely sinusoidal.
+      </p>
+      <figure class="chart-card chart-primary">
+        <figcaption>Voltage, current &amp; instantaneous power <span class="muted">· reconstructed</span></figcaption>
+        <div id="wave-combined" class="chart" data-height-sm="260" data-height="320"></div>
+      </figure>
+      <dl id="wave-facts" class="wave-facts"></dl>
+      <div class="wave-grid">
+        <figure class="chart-card">
+          <figcaption>Voltage v(t) <span class="muted">· reconstructed</span></figcaption>
+          <div id="wave-v" class="chart" data-height-sm="170" data-height="200"></div>
+        </figure>
+        <figure class="chart-card">
+          <figcaption>Current i(t) <span class="muted">· reconstructed</span></figcaption>
+          <div id="wave-i" class="chart" data-height-sm="170" data-height="200"></div>
+        </figure>
+      </div>
+    </section>
+
+    <!-- Trends -->
+    <section class="panel" aria-labelledby="trend-title">
+      <div class="panel-head">
+        <h2 id="trend-title">Trends</h2>
+        <span id="paused-badge" class="badge badge-warning" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>
+          Paused · recording continues
+        </span>
+      </div>
+      <div id="trend-grid" class="trend-grid"></div>
+    </section>
+
+    <!-- Raw data -->
+    <details class="panel raw-log">
+      <summary><h2>Raw data</h2><span class="muted">latest lines, accepted and rejected</span></summary>
+      <ol id="raw-log" class="raw-lines"></ol>
+    </details>
+  </main>
+
+  <footer class="app-footer">
+    <p>
+      USB Serial requires desktop Chrome, Edge or Opera. Bluetooth works in Chrome / Edge on desktop and Chrome on Android.
+      Need to check your module's UUIDs? Use the <a href="tools/ble-probe.html">BLE probe tool</a>.
+    </p>
+  </footer>
+
+  <!-- Settings -->
+  <dialog id="settings-dialog" class="dialog">
+    <form id="settings-form" method="dialog">
+      <h2>Settings</h2>
+
+      <fieldset>
+        <legend>USB Serial</legend>
+        <label>Baud rate
+          <select name="baudRate"></select>
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Bluetooth LE (AT-09 / HM-10)</legend>
+        <label>Service UUID
+          <input name="bleServiceUuid" autocomplete="off" spellcheck="false" placeholder="ffe0">
+        </label>
+        <label>Characteristic UUID
+          <input name="bleCharacteristicUuid" autocomplete="off" spellcheck="false" placeholder="ffe1">
+        </label>
+        <label>Device name prefix <span class="muted">(optional filter)</span>
+          <input name="bleNamePrefix" autocomplete="off" spellcheck="false" placeholder="e.g. BT05 — blank shows all devices">
+        </label>
+        <p class="hint">16-bit (<code>ffe0</code>, <code>0xFFE0</code>) or full 128-bit UUIDs are accepted.
+          Verify yours with the <a href="tools/ble-probe.html">BLE probe tool</a>.</p>
+      </fieldset>
+
+      <p id="settings-error" class="form-error" role="alert"></p>
+
+      <div class="dialog-actions">
+        <button type="button" id="settings-reset" class="btn">Reset defaults</button>
+        <span class="spacer"></span>
+        <button value="cancel" formnovalidate class="btn">Cancel</button>
+        <button value="save" id="settings-save" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="vendor/uplot/uPlot.iife.min.js"></script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

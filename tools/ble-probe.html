@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>BLE probe — Energy Monitor</title>
+  <link rel="stylesheet" href="../css/styles.css">
+  <style>
+    .probe { max-width: 900px; margin: 0 auto; padding: 16px; display: grid; gap: 14px; }
+    .probe textarea { width: 100%; min-height: 150px; font: 0.85rem/1.5 var(--mono); padding: 10px; border-radius: 10px;
+      border: 1px solid var(--border); background: var(--surface-2); color: var(--text-1); }
+    .probe .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .svc { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: var(--surface-2); }
+    .svc h3 { margin: 0 0 6px; font: 600 0.9rem var(--mono); overflow-wrap: anywhere; }
+    .chr { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; align-items: center; padding: 6px 0; border-top: 1px solid var(--grid); }
+    .chr code { overflow-wrap: anywhere; }
+    .props { font-size: 0.78rem; color: var(--text-2); }
+    .hit { box-shadow: inset 3px 0 0 var(--good); padding-left: 8px; }
+    #log { max-height: 340px; }
+    .probe .btn { min-height: 40px; }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <div><h1>BLE probe</h1><p class="subtitle">Discover your module's services &amp; characteristics</p></div>
+    </div>
+    <a class="btn" href="../index.html" style="display:inline-grid;place-items:center;text-decoration:none">Dashboard</a>
+  </header>
+
+  <main class="probe">
+    <section class="panel">
+      <p class="panel-note">
+        Web Bluetooth only reveals services you ask for up front, so list every candidate below
+        (one per line, 16-bit or 128-bit). After connecting, every matching service and its characteristics are
+        listed. Subscribe to a <strong>notify</strong> characteristic to watch the raw data stream — you should see
+        <code>EM,1,…</code> arriving in ~20-byte pieces. For a complete, unfiltered view, also check with the
+        nRF Connect app or <code>chrome://bluetooth-internals</code>.
+      </p>
+      <label class="toolbar-label" for="candidates">Candidate service UUIDs</label>
+      <textarea id="candidates" spellcheck="false">ffe0      # HM-10 / AT-09 / CC41-A / BT05 UART
+fff0      # some JDY / generic clones
+6e400001-b5a3-f393-e0a9-e50e24dcca9e   # Nordic UART Service
+49535343-fe7d-4ae5-8fa9-9fafd205e455   # Microchip ISSC transparent UART
+180a      # Device Information
+1800      # Generic Access</textarea>
+      <div class="row" style="margin-top:10px">
+        <input id="prefix" placeholder="Name prefix filter (optional, e.g. BT05)" style="flex:1;min-width:200px">
+        <button id="scan" class="btn btn-primary" type="button">Scan &amp; connect</button>
+        <button id="disc" class="btn" type="button" disabled>Disconnect</button>
+      </div>
+      <p id="msg" class="connection-message" style="margin-top:10px"></p>
+    </section>
+
+    <section id="services" class="panel" hidden>
+      <h2 style="margin-bottom:10px">Discovered services</h2>
+      <div id="svc-list" style="display:grid;gap:10px"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h2>Notifications</h2><button id="clear" class="btn" type="button">Clear</button></div>
+      <ol id="log" class="raw-lines"></ol>
+    </section>
+  </main>
+
+  <script type="module" src="ble-probe.js"></script>
+</body>
+</html>

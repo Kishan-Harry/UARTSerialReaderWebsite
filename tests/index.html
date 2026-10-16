@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Protocol tests</title>
+  <style>
+    body { font: 14px/1.5 system-ui, sans-serif; margin: 24px; }
+    #summary { font-size: 18px; font-weight: 600; }
+    #summary[data-result="pass"] { color: #0a7d0a; }
+    #summary[data-result="fail"] { color: #c62828; }
+    ul { list-style: none; padding: 0; font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+    .fail { color: #c62828; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>Protocol &amp; framing tests</h1>
+  <p id="summary">Running…</p>
+  <ul id="results"></ul>
+  <script type="module" src="tests.js"></script>
+</body>
+</html>

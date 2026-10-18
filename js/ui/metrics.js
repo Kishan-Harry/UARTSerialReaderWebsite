@@ -8,7 +8,7 @@ export const METRICS = {
   realPowerW:      { label: 'Real power',     unit: 'W',  decimals: 2, color: '--s-power' },
   apparentPowerVA: { label: 'Apparent power', unit: 'VA', decimals: 2, color: '--s-apparent' },
   powerFactor:     { label: 'Power factor',   unit: '',   decimals: 2, color: '--s-pf' },
-  frequencyHz:     { label: 'Frequency',      unit: 'Hz', decimals: 2, color: '--s-frequency' },
+  frequencyHz:     { label: 'Frequency',      unit: 'Hz', decimals: 2, color: '--s-frequency', sparkMinSpan: 2 },
   energyJ:         { label: 'Energy',         unit: 'J',  decimals: 2, color: '--s-energy' },
 };
 

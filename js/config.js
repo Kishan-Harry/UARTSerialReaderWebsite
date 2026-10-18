@@ -7,6 +7,8 @@ export const CONFIG = {
     version: '1',
     // A line longer than this without a terminator is treated as garbage and dropped.
     maxLineLength: 256,
+    // The supply runs at ~500 Hz. Readings outside this band are kept but flagged.
+    frequencyHz: { nominal: 500, min: 450, max: 550 },
   },
 
   serial: {

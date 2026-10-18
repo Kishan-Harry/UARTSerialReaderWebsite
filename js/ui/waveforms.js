@@ -181,9 +181,9 @@ export class Waveforms {
 
   _renderFacts(w, r) {
     const rows = [
-      ['Period T',          w && `${fmt(w.periodMs, 2)} ms`],
+      ['Period T',          w && `${fmt(w.periodMs, 3)} ms`],
       ['Phase φ',           w && `${fmt(w.phi * DEG, 1)}° lag`],
-      ['Current lag Δt',    w && `${fmt(w.lagMs, 2)} ms`],
+      ['Current lag Δt',    w && `${fmt(w.lagMs * 1000, 0)} µs`],
       ['V peak',            w && `${fmt(w.vPeak, 2)} V`],
       ['I peak (ideal)',    w && `${fmt(w.iPeak, 1)} mA`],
       ['I peak (measured)', r && `${fmt(r.currentPeakMa, 1)} mA`],

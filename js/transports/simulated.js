@@ -31,7 +31,7 @@ export class SimulatedTransport extends Transport {
   }
 
   _resetModel() {
-    this.frequency = 50;
+    this.frequency = CONFIG.protocol.frequencyHz.nominal;
     this.voltage = 14.25;
     this.energyJ = 0;
     this.load = LOADS[1];
@@ -69,7 +69,7 @@ export class SimulatedTransport extends Transport {
     }
 
     // Slow random walks toward the active load profile, plus measurement noise.
-    this.frequency += (50 - this.frequency) * 0.05 + jitter(0.015);
+    this.frequency += (CONFIG.protocol.frequencyHz.nominal - this.frequency) * 0.05 + jitter(0.15);
     this.voltage += (14.25 - this.voltage) * 0.1 + jitter(0.05) - (this.current - 90) * 0.0004;
     this.current += (this.load.currentMa - this.current) * 0.35 + jitter(1.2);
     this.pf += (this.load.pf - this.pf) * 0.35 + jitter(0.005);

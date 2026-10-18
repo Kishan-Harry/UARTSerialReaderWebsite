@@ -77,7 +77,7 @@ export class Chart {
 
     const xSeries = o.time
       ? { value: (u, ts) => (ts == null ? '—' : new Date(ts * 1000).toLocaleTimeString()) }
-      : { label: 't', value: (u, v) => (v == null ? '—' : `${v.toFixed(2)} ${o.xUnit ?? ''}`) };
+      : { label: 't', value: (u, v) => (v == null ? '—' : `${v.toFixed(3)} ${o.xUnit ?? ''}`) };
 
     const uopts = {
       width: Math.max(200, this.container.clientWidth),
@@ -111,7 +111,7 @@ export class Chart {
           space: o.time ? 70 : 40,
           values: o.time
             ? (u, vals) => vals.map((v) => clockLabel(v))
-            : (u, vals) => vals.map((v) => `${+v.toFixed(1)}`),
+            : (u, vals) => vals.map((v) => `${+v.toFixed(3)}`),
           label: o.time ? undefined : o.xUnit,
           labelSize: o.time ? 0 : 18,
           labelFont: axis.font,

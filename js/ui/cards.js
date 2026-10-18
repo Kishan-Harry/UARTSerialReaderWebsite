@@ -40,7 +40,7 @@ export class Cards {
       const c = this.cards[key];
       c.num.textContent = fmt(record[key], m.decimals);
       c.sub.textContent = this._subtitle(key, record);
-      this._spark(c.line, this.store.tail(key, CONFIG.ui.sparklinePoints), m.decimals);
+      this._spark(c.line, this.store.tail(key, CONFIG.ui.sparklinePoints), m);
     }
     this.setStale(false);
   }
@@ -65,14 +65,14 @@ export class Cards {
     }
   }
 
-  _spark(polyline, values, decimals) {
+  _spark(polyline, values, { decimals, sparkMinSpan }) {
     if (values.length < 2) {
       polyline.setAttribute('points', '');
       return;
     }
     let lo = Math.min(...values), hi = Math.max(...values);
     // Minimum span so last-digit rounding noise doesn't fill the whole sparkline.
-    const minSpan = Math.max(10 * 10 ** -decimals, Math.abs((lo + hi) / 2) * 0.02);
+    const minSpan = sparkMinSpan ?? Math.max(10 * 10 ** -decimals, Math.abs((lo + hi) / 2) * 0.02);
     if (hi - lo < minSpan) {
       const mid = (lo + hi) / 2;
       lo = mid - minSpan / 2;

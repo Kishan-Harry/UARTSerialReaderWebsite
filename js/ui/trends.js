@@ -10,9 +10,9 @@ const TRENDS = [
   { title: 'Power factor',           keys: ['powerFactor'],                    yUnit: '',
     yRange: (u, min, max) => [Math.min(0, Math.floor(min * 10) / 10), Math.max(1, max)] },
   { title: 'Frequency',              keys: ['frequencyHz'],                    yUnit: 'Hz',
-    // Keep at least ±0.1 Hz visible so normal grid wander doesn't look dramatic.
+    // Keep at least ±1 Hz visible so normal wander around 500 Hz doesn't look dramatic.
     yRange: (u, min, max) => {
-      const mid = (min + max) / 2, half = Math.max(0.1, (max - min) / 2 * 1.2);
+      const mid = (min + max) / 2, half = Math.max(1, (max - min) / 2 * 1.2);
       return [mid - half, mid + half];
     } },
 ];

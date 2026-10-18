@@ -1,6 +1,6 @@
 // Parser for the energy-monitor UART protocol, version 1.
 //
-//   EM,1,50.00Hz,14.25V,123.4mA,174.5mA,1.42W,1.75VA,0.81,125.60J
+//   EM,1,500.00Hz,14.25V,123.4mA,174.5mA,1.42W,1.75VA,0.81,125.60J
 //
 // One record per line. The parser never throws: it returns either
 //   { ok: true,  data, warnings }
@@ -96,7 +96,8 @@ function plausibilityWarnings(d) {
   if (Math.abs(d.powerFactor) > 1.005) w.push('|PF| > 1');
   if (Math.abs(d.realPowerW) > d.apparentPowerVA * 1.02 + 0.01) w.push('P exceeds S');
   if (d.voltageRmsV < 0 || d.currentRmsMa < 0 || d.apparentPowerVA < 0) w.push('Negative RMS value');
-  if (d.frequencyHz !== 0 && (d.frequencyHz < 40 || d.frequencyHz > 70)) w.push('Frequency outside 40–70 Hz');
+  const { min, max } = CONFIG.protocol.frequencyHz;
+  if (d.frequencyHz < min || d.frequencyHz > max) w.push(`Frequency outside ${min}–${max} Hz`);
   if (d.currentRmsMa > 0 && d.currentPeakMa < d.currentRmsMa * 0.99) w.push('Peak current below RMS');
   return w;
 }

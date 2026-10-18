@@ -18,7 +18,7 @@ const eq = (a, b, msg = '') => {
 };
 const assert = (cond, msg) => { if (!cond) throw new Error(msg); };
 
-const SAMPLE = 'EM,1,50.00Hz,14.25V,123.4mA,174.5mA,1.42W,1.75VA,0.81,125.60J';
+const SAMPLE = 'EM,1,500.00Hz,14.25V,123.4mA,174.5mA,1.42W,1.75VA,0.81,125.60J';
 const collect = (opts = {}) => {
   const lines = [], overflows = [];
   const f = new LineFramer({ onLine: (l) => lines.push(l), onOverflow: (d) => overflows.push(d), ...opts });
@@ -55,8 +55,8 @@ test('framer: several lines in one chunk, plus a trailing partial', () => {
   const { f, lines } = collect();
   f.push(`${SAMPLE}\r\n${SAMPLE}\r\nEM,1,50`);
   eq(lines.length, 2);
-  f.push('.00Hz\r\n');
-  eq(lines[2], 'EM,1,50.00Hz');
+  f.push('0.00Hz\r\n');
+  eq(lines[2], 'EM,1,500.00Hz');
 });
 
 test('framer: byte-at-a-time delivery', () => {
@@ -93,14 +93,25 @@ test('parser: example record', () => {
   const r = parseRecord(SAMPLE);
   assert(r.ok, r.reason);
   eq(r.data, {
-    frequencyHz: 50, voltageRmsV: 14.25, currentRmsMa: 123.4, currentPeakMa: 174.5,
+    frequencyHz: 500, voltageRmsV: 14.25, currentRmsMa: 123.4, currentPeakMa: 174.5,
     realPowerW: 1.42, apparentPowerVA: 1.75, powerFactor: 0.81, energyJ: 125.6,
   });
   eq(r.warnings, []);
 });
 
 test('parser: tolerates spaces around fields', () => {
-  assert(parseRecord('EM, 1, 50.00Hz, 14.25V,123.4mA,174.5mA, 1.42W,1.75VA,0.81,125.60J').ok);
+  assert(parseRecord('EM, 1, 500.00Hz, 14.25V,123.4mA,174.5mA, 1.42W,1.75VA,0.81,125.60J').ok);
+});
+
+test('parser: frequency outside 450–550 Hz is flagged, not rejected', () => {
+  for (const f of ['50.00', '449.99', '550.01']) {
+    const r = parseRecord(SAMPLE.replace('500.00Hz', `${f}Hz`));
+    assert(r.ok, r.reason);
+    assert(r.warnings.some((w) => w.startsWith('Frequency outside')), `${f} Hz should warn`);
+  }
+  for (const f of ['450.00', '550.00', '512.34']) {
+    eq(parseRecord(SAMPLE.replace('500.00Hz', `${f}Hz`)).warnings, [], `${f} Hz:`);
+  }
 });
 
 test('parser: negative and zero values', () => {
@@ -116,7 +127,7 @@ const rejects = {
   'missing field': SAMPLE.replace(',0.81', ''),
   'extra field': SAMPLE + ',1.00',
   'truncated record': SAMPLE.slice(0, 30),
-  'wrong unit (shifted fields)': 'EM,1,14.25V,50.00Hz,123.4mA,174.5mA,1.42W,1.75VA,0.81,125.60J',
+  'wrong unit (shifted fields)': 'EM,1,14.25V,500.00Hz,123.4mA,174.5mA,1.42W,1.75VA,0.81,125.60J',
   'A instead of mA': SAMPLE.replace('123.4mA', '0.1234A'),
   'non-numeric value': SAMPLE.replace('14.25V', '14.2#V'),
   'nan from dtostrf': SAMPLE.replace('1.42W', 'nanW'),
@@ -151,13 +162,13 @@ test('parser: bad checksum rejected', () => {
 });
 
 test('parser: plausibility warnings do not reject', () => {
-  const r = parseRecord('EM,1,50.00Hz,14.25V,123.4mA,174.5mA,2.50W,1.75VA,1.20,125.60J');
+  const r = parseRecord('EM,1,500.00Hz,14.25V,123.4mA,174.5mA,2.50W,1.75VA,1.20,125.60J');
   assert(r.ok);
   assert(r.warnings.includes('P exceeds S') && r.warnings.includes('|PF| > 1'), JSON.stringify(r.warnings));
 });
 
 test('formatRecord round-trips through the framer and parser', () => {
-  const d = { frequencyHz: 49.98, voltageRmsV: 14.2, currentRmsMa: 99.95, currentPeakMa: 141.3,
+  const d = { frequencyHz: 499.98, voltageRmsV: 14.2, currentRmsMa: 99.95, currentPeakMa: 141.3,
               realPowerW: 1.3, apparentPowerVA: 1.42, powerFactor: 0.92, energyJ: 3600 };
   for (const checksum of [false, true]) {
     const { f, lines } = collect();
@@ -217,29 +228,29 @@ test('csv: header and row formatting', () => {
   s.add(parseRecord(SAMPLE).data);
   const [header, row] = buildCsv(s).split('\r\n');
   eq(header, 'timestamp_iso,elapsed_s,frequency_hz,voltage_rms_v,current_rms_ma,current_peak_ma,real_power_w,apparent_power_va,power_factor,energy_j');
-  eq(row.split(',').slice(1).join(','), '0.000,50.00,14.25,123.4,174.5,1.42,1.75,0.81,125.60');
+  eq(row.split(',').slice(1).join(','), '0.000,500.00,14.25,123.4,174.5,1.42,1.75,0.81,125.60');
 });
 
 // --- Waveform reconstruction -------------------------------------------------
 
 const near = (a, b, tol, msg) => assert(Math.abs(a - b) <= tol, `${msg}: expected ${b}, got ${a}`);
-const SAMPLE_DATA = parseRecord(SAMPLE).data; // 50 Hz, 14.25 V, 123.4 mA, PF 0.81
+const SAMPLE_DATA = parseRecord(SAMPLE).data; // 500 Hz, 14.25 V, 123.4 mA, PF 0.81
 
 test('waveform: peaks, period and lagging phase from PF', () => {
   const w = reconstructWaveforms(SAMPLE_DATA, { cycles: 3, samplesPerCycle: 360 });
-  near(w.periodMs, 20, 1e-9, 'period');
+  near(w.periodMs, 2, 1e-9, 'period');
   near(w.vPeak, 14.25 * Math.SQRT2, 1e-9, 'V peak');
   near(Math.max(...w.v), w.vPeak, 1e-3, 'sampled V peak');
   near(Math.max(...w.i), 123.4 * Math.SQRT2, 0.01, 'sampled I peak');
   near(w.phi, Math.acos(0.81), 1e-12, 'phi');
-  near(w.lagMs, Math.acos(0.81) / (2 * Math.PI) * 20, 1e-9, 'lag');
-  eq(w.rangeMs, [0, 60]);
+  near(w.lagMs, Math.acos(0.81) / (2 * Math.PI) * 2, 1e-9, 'lag');
+  eq(w.rangeMs, [0, 6]);
 });
 
 test('waveform: current lags — i(t) crosses zero rising Δt after v(t)', () => {
   const w = reconstructWaveforms(SAMPLE_DATA, { cycles: 1, samplesPerCycle: 3600 });
   const k = w.i.findIndex((x, n) => n > 0 && w.i[n - 1] < 0 && x >= 0);
-  near(w.t[k], w.lagMs, 20 / 3600 + 1e-9, 'rising zero crossing');
+  near(w.t[k], w.lagMs, 2 / 3600 + 1e-9, 'rising zero crossing');
 });
 
 test('waveform: p(t) = v·i, mean equals V·I·PF, extremes S(cosφ ± 1)', () => {

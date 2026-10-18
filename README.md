@@ -44,14 +44,14 @@ Protocol tests run in the browser at <http://localhost:8000/tests/>.
 One record per line, terminated by `\r\n`, approximately every 1.2 s:
 
 ```
-EM,1,50.00Hz,14.25V,123.4mA,174.5mA,1.42W,1.75VA,0.81,125.60J
+EM,1,500.00Hz,14.25V,123.4mA,174.5mA,1.42W,1.75VA,0.81,125.60J
 ```
 
 | # | Field | Unit | Decimals |
 |---|---|---|---|
 | 1 | Device identifier `EM` | | |
 | 2 | Protocol version `1` | | |
-| 3 | Frequency | Hz | 2 |
+| 3 | Frequency (expected 450–550 Hz) | Hz | 2 |
 | 4 | Voltage RMS | V | 2 |
 | 5 | Current RMS | mA | 1 |
 | 6 | Current peak | mA | 1 |

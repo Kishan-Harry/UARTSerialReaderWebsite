@@ -2,6 +2,7 @@
 // notifications, so the dashboard's UUIDs can be verified against real hardware.
 
 import { normalizeUuid, shortUuid } from '../js/transports/ble-uuid.js';
+import { parseNamePrefixes, buildRequestOptions } from '../js/transports/web-bluetooth.js';
 import { loadSettings, saveSettings } from '../js/ui/settings.js';
 
 const $ = (id) => document.getElementById(id);
@@ -9,6 +10,9 @@ const PROP_NAMES = ['broadcast', 'read', 'writeWithoutResponse', 'write', 'notif
   'authenticatedSignedWrites', 'reliableWrite', 'writableAuxiliaries'];
 
 let device = null;
+
+// Start from the dashboard's name filter so both pages agree.
+$('prefix').value = loadSettings().bleNamePrefix;
 
 function msg(text, error = false) {
   $('msg').textContent = text;
@@ -55,10 +59,9 @@ $('scan').addEventListener('click', async () => {
   const { uuids, bad } = candidates();
   if (bad.length) { msg(`Invalid UUID(s): ${bad.join(', ')}`, true); return; }
 
-  const prefix = $('prefix').value.trim();
-  const options = prefix
-    ? { filters: [{ namePrefix: prefix }], optionalServices: uuids }
-    : { acceptAllDevices: true, optionalServices: uuids };
+  const prefixes = parseNamePrefixes($('prefix').value);
+  saveSettings({ ...loadSettings(), bleNamePrefix: prefixes.join(', ') });
+  const options = buildRequestOptions({ prefixes, optionalServices: uuids });
 
   try {
     msg('Choose a device…');

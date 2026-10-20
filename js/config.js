@@ -22,9 +22,12 @@ export const CONFIG = {
   ble: {
     serviceUuid: 'ffe0',
     characteristicUuid: 'ffe1',
-    // Optional advertised-name prefix filter for the device chooser (e.g. "BT05").
-    // Empty = show all nearby devices.
-    namePrefix: '',
+    // Device chooser filter: comma-separated, case-sensitive name prefixes.
+    // AT-09 modules advertise as "BT05" by default (some clones: "MLT-BT05",
+    // "HMSoft"). Empty = list every nearby device.
+    namePrefix: 'BT05',
+    // Also list devices that advertise the UART service UUID, whatever their name.
+    matchService: false,
   },
 
   simulation: {

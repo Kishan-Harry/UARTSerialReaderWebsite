@@ -12,7 +12,7 @@ import { MeasurementStore } from './data/store.js';
 import { downloadCsv } from './data/csv-export.js';
 import { SimulatedTransport } from './transports/simulated.js';
 import { WebSerialTransport } from './transports/web-serial.js';
-import { WebBluetoothTransport } from './transports/web-bluetooth.js';
+import { WebBluetoothTransport, parseNamePrefixes, describeFilter } from './transports/web-bluetooth.js';
 import { Cards } from './ui/cards.js';
 import { Trends } from './ui/trends.js';
 import { Waveforms } from './ui/waveforms.js';
@@ -28,6 +28,7 @@ const TRANSPORTS = {
     serviceUuid: s.bleServiceUuid,
     characteristicUuid: s.bleCharacteristicUuid,
     namePrefix: s.bleNamePrefix,
+    matchService: s.bleMatchService,
   }) },
 };
 
@@ -120,7 +121,22 @@ function refreshSupport() {
   if (sourceInputs.find((i) => i.checked)?.disabled) sourceInputs[0].checked = true;
   $('support-note').hidden = notes.length === 0;
   $('support-note').textContent = notes.join(' ');
+  refreshFilterNote();
 }
+
+// With Bluetooth selected, say which devices the chooser will list.
+function refreshFilterNote() {
+  const show = selectedSource() === 'bluetooth' && WebBluetoothTransport.isSupported();
+  $('ble-filter-note').hidden = !show;
+  if (!show) return;
+  const text = describeFilter(parseNamePrefixes(settings.bleNamePrefix), settings.bleMatchService);
+  $('ble-filter-text').textContent = `Bluetooth chooser lists ${text}`;
+}
+
+$('ble-filter-edit').addEventListener('click', () => {
+  $('settings-open').click();
+  $('settings-form').elements.bleNamePrefix.focus();
+});
 
 async function connect() {
   const source = selectedSource();
@@ -280,6 +296,7 @@ initSettingsDialog({
   onSave(partial) {
     settings = { ...settings, ...partial };
     saveSettings(settings);
+    refreshFilterNote();
     if (transport?.isActive) {
       $('connection-message').textContent = 'Settings saved — reconnect to apply them.';
     }

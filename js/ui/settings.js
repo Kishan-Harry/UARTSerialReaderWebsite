@@ -4,23 +4,33 @@ import { CONFIG } from '../config.js';
 import { normalizeUuid } from '../transports/ble-uuid.js';
 
 const STORAGE_KEY = 'em-dashboard-settings';
+const SETTINGS_VERSION = 2;
 
 export const DEFAULTS = Object.freeze({
+  settingsVersion: SETTINGS_VERSION,
   source: 'simulated',
   baudRate: CONFIG.serial.baudRate,
   bleServiceUuid: CONFIG.ble.serviceUuid,
   bleCharacteristicUuid: CONFIG.ble.characteristicUuid,
   bleNamePrefix: CONFIG.ble.namePrefix,
+  bleMatchService: CONFIG.ble.matchService,
   windowS: CONFIG.ui.defaultWindowS,
   theme: null, // null = follow the OS
 });
 
 export function loadSettings() {
   try {
-    return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') };
+    return migrateSettings({ ...JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') });
   } catch {
     return { ...DEFAULTS };
   }
+}
+
+export function migrateSettings(saved) {
+  // v1 saved the then-default empty name filter; adopt the new "BT05" default
+  // unless the user had actually typed a filter.
+  if ((saved.settingsVersion ?? 1) < 2 && saved.bleNamePrefix === '') delete saved.bleNamePrefix;
+  return { ...DEFAULTS, ...saved, settingsVersion: SETTINGS_VERSION };
 }
 
 export function saveSettings(settings) {
@@ -42,6 +52,7 @@ export function initSettingsDialog({ dialog, openButton, getSettings, onSave }) 
     form.elements.bleServiceUuid.value = s.bleServiceUuid;
     form.elements.bleCharacteristicUuid.value = s.bleCharacteristicUuid;
     form.elements.bleNamePrefix.value = s.bleNamePrefix;
+    form.elements.bleMatchService.checked = Boolean(s.bleMatchService);
     error.textContent = '';
     for (const el of form.elements) el.removeAttribute?.('aria-invalid');
   };
@@ -74,6 +85,7 @@ export function initSettingsDialog({ dialog, openButton, getSettings, onSave }) 
       bleServiceUuid: form.elements.bleServiceUuid.value.trim(),
       bleCharacteristicUuid: form.elements.bleCharacteristicUuid.value.trim(),
       bleNamePrefix: form.elements.bleNamePrefix.value.trim(),
+      bleMatchService: form.elements.bleMatchService.checked,
     });
   });
 }

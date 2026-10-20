@@ -92,6 +92,14 @@ The page labels all of these as *reconstructed · idealised*. Harmonics and dist
 
 The AT-09 is a CC2541 BLE module, typically running HM-10-compatible firmware. Most expose service **`FFE0`** with one characteristic **`FFE1`** (read / write-without-response / notify) carrying the UART data. Clones vary, so the UUIDs are configurable in **Settings** (16-bit or 128-bit).
 
+**Device filter.** The Bluetooth chooser only lists devices whose name starts with **`BT05`** (the AT-09 default), so other phones, headphones and laptops in the room are hidden. The active filter is shown under the Connect button; change it with *Change filter* or in **Settings → Device name filter**:
+
+- Matching is a case-sensitive name prefix. Separate several with commas, e.g. `BT05, MLT-BT05, HMSoft`.
+- If you renamed your module (`AT+NAME…`), enter the new name. Giving each module a unique name is the easiest way to tell your own module apart when classmates have AT-09s too.
+- *Also list any device advertising the service UUID* adds modules that advertise `FFE0`, whatever their name.
+- Leave the filter blank to list every nearby device.
+- If your module doesn't appear, check that it is powered and that no other phone or PC is connected to it. A connected AT-09 stops advertising (its LED stays solid instead of blinking).
+
 Things to know:
 
 - The AT-09 is **BLE only** — it never appears as a COM port; use the *Bluetooth* source.
@@ -151,4 +159,5 @@ All paths are relative and there is no build step, so nothing else is needed. (`
 | First line after connecting rejected | Opening the port reset the board (DTR auto-reset); harmless. |
 | *Service ffe0 not found* | Your module uses different UUIDs — use the BLE probe tool and update Settings. |
 | Bluetooth chooser shows no devices (Android) | Turn on Bluetooth and Location, and grant Chrome the *Nearby devices* permission. |
+| Module missing from the chooser | Its name doesn't match the filter (check Settings, or open the BLE probe with a blank filter to see its real name), or another device is still connected to it. |
 | Status shows *No data* while connected | The device stopped sending, or (BLE) the ATmega isn't wired to the module's RX. |

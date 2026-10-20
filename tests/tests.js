@@ -7,6 +7,8 @@ import { normalizeUuid, shortUuid } from '../js/transports/ble-uuid.js';
 import { MeasurementStore } from '../js/data/store.js';
 import { buildCsv } from '../js/data/csv-export.js';
 import { reconstructWaveforms } from '../js/ui/waveforms.js';
+import { parseNamePrefixes, buildRequestOptions } from '../js/transports/web-bluetooth.js';
+import { migrateSettings } from '../js/ui/settings.js';
 
 const results = [];
 const test = (name, fn) => {
@@ -198,6 +200,39 @@ test('uuid: invalid rejected', () => {
 test('uuid: short display form', () => {
   eq(shortUuid('0000ffe1-0000-1000-8000-00805f9b34fb'), 'ffe1');
   eq(shortUuid('6e400001-b5a3-f393-e0a9-e50e24dcca9e'), '6e400001-b5a3-f393-e0a9-e50e24dcca9e');
+});
+
+// --- BLE device filter -------------------------------------------------------
+
+const FFE0 = '0000ffe0-0000-1000-8000-00805f9b34fb';
+
+test('ble filter: parse comma-separated prefixes', () => {
+  eq(parseNamePrefixes('BT05'), ['BT05']);
+  eq(parseNamePrefixes(' BT05, MLT-BT05 ;HMSoft,, BT05 '), ['BT05', 'MLT-BT05', 'HMSoft']);
+  eq(parseNamePrefixes(''), []);
+  eq(parseNamePrefixes(undefined), []);
+});
+
+test('ble filter: name prefix only lists matching devices', () => {
+  eq(buildRequestOptions({ prefixes: ['BT05'], optionalServices: [FFE0] }),
+    { filters: [{ namePrefix: 'BT05' }], optionalServices: [FFE0] });
+});
+
+test('ble filter: several prefixes plus service match are OR-ed', () => {
+  eq(buildRequestOptions({ prefixes: ['BT05', 'HMSoft'], matchService: true, optionalServices: [FFE0] }),
+    { filters: [{ namePrefix: 'BT05' }, { namePrefix: 'HMSoft' }, { services: [FFE0] }], optionalServices: [FFE0] });
+});
+
+test('ble filter: no filter falls back to all devices', () => {
+  eq(buildRequestOptions({ optionalServices: [FFE0] }), { acceptAllDevices: true, optionalServices: [FFE0] });
+});
+
+test('settings: v1 blank name filter migrates to BT05; explicit choices kept', () => {
+  eq(migrateSettings({}).bleNamePrefix, 'BT05');
+  eq(migrateSettings({ bleNamePrefix: '' }).bleNamePrefix, 'BT05');
+  eq(migrateSettings({ bleNamePrefix: 'MyModule' }).bleNamePrefix, 'MyModule');
+  eq(migrateSettings({ settingsVersion: 2, bleNamePrefix: '' }).bleNamePrefix, '', 'v2 blank means "all devices":');
+  eq(migrateSettings({}).settingsVersion, 2);
 });
 
 // --- Store & CSV -------------------------------------------------------------

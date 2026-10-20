@@ -8,6 +8,38 @@
 import { Transport, createChunkDecoder } from './transport.js';
 import { normalizeUuid, shortUuid } from './ble-uuid.js';
 
+/** "BT05, MLT-BT05" → ['BT05', 'MLT-BT05']. Matching is a case-sensitive name prefix. */
+export function parseNamePrefixes(text) {
+  return [...new Set(String(text ?? '').split(/[,;]/).map((s) => s.trim()).filter(Boolean))];
+}
+
+/**
+ * Options for navigator.bluetooth.requestDevice().
+ *
+ * Filters are OR'd: a device appears if its name starts with any prefix, or
+ * (when matchService is set) it advertises the first optional service. With no
+ * filters at all, every nearby device is listed.
+ *
+ * optionalServices is always required: Web Bluetooth hides any service that
+ * wasn't requested up front. Service matching is opt-in because AT-09 clones
+ * don't reliably advertise FFE0, and in a lab it also pulls in other people's
+ * HM-10-style modules.
+ */
+export function buildRequestOptions({ prefixes = [], matchService = false, optionalServices = [] }) {
+  const filters = prefixes.map((namePrefix) => ({ namePrefix }));
+  if (matchService && optionalServices.length) filters.push({ services: [optionalServices[0]] });
+  return filters.length
+    ? { filters, optionalServices }
+    : { acceptAllDevices: true, optionalServices };
+}
+
+/** Human-readable filter, e.g. 'devices named BT05… or HMSoft…'. */
+export function describeFilter(prefixes, matchService = false) {
+  const parts = prefixes.map((p) => `named ${p}…`);
+  if (matchService) parts.push('advertising the UART service');
+  return parts.length ? `devices ${parts.join(' or ')}` : 'all nearby devices';
+}
+
 const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) ||
   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
@@ -24,11 +56,12 @@ export class WebBluetoothTransport extends Transport {
     return 'Web Bluetooth is supported in Chrome / Edge on desktop and Chrome on Android.';
   }
 
-  constructor({ serviceUuid = 'ffe0', characteristicUuid = 'ffe1', namePrefix = '' } = {}) {
+  constructor({ serviceUuid = 'ffe0', characteristicUuid = 'ffe1', namePrefix = '', matchService = false } = {}) {
     super();
     this.serviceUuid = serviceUuid;
     this.characteristicUuid = characteristicUuid;
-    this.namePrefix = namePrefix.trim();
+    this.namePrefix = namePrefix;
+    this.matchService = matchService;
     this.device = null;
     this.characteristic = null;
     this.userDisconnect = false;
@@ -51,20 +84,20 @@ export class WebBluetoothTransport extends Transport {
       return;
     }
 
-    this._setStatus('connecting', 'Choose your Bluetooth module…');
+    const prefixes = parseNamePrefixes(this.namePrefix);
+    const filterText = describeFilter(prefixes, this.matchService);
+    this._setStatus('connecting', `Choose your Bluetooth module (listing ${filterText})`);
     this.userDisconnect = false;
 
-    // Clone modules don't reliably advertise FFE0, so by default show every
-    // device and only *request access* to the service. optionalServices is
-    // mandatory: Web Bluetooth hides any service not listed there.
-    const options = this.namePrefix
-      ? { filters: [{ namePrefix: this.namePrefix }], optionalServices: [service] }
-      : { acceptAllDevices: true, optionalServices: [service] };
+    const options = buildRequestOptions({ prefixes, matchService: this.matchService, optionalServices: [service] });
 
     try {
       this.device = await navigator.bluetooth.requestDevice(options);
     } catch (err) {
-      this._setStatus('disconnected', err.name === 'NotFoundError' ? 'No device selected' : err.message);
+      const hint = prefixes.length
+        ? ` Not listed? Check the module is powered and not connected to another phone/PC (LED blinking), and that its name starts with ${prefixes.join(' or ')} — or change the filter in Settings.`
+        : '';
+      this._setStatus('disconnected', err.name === 'NotFoundError' ? `No device selected.${hint}` : err.message);
       return;
     }
 

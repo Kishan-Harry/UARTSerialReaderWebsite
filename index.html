@@ -51,6 +51,10 @@
       </div>
       <button id="connect-btn" class="btn btn-primary" type="button">Connect</button>
       <p id="connection-message" class="connection-message">Select a data source and press Connect.</p>
+      <p id="ble-filter-note" class="filter-note" hidden>
+        <span id="ble-filter-text"></span>
+        <button id="ble-filter-edit" type="button" class="link-btn">Change filter</button>
+      </p>
       <p id="support-note" class="support-note" hidden></p>
     </section>
 
@@ -158,8 +162,15 @@
         <label>Characteristic UUID
           <input name="bleCharacteristicUuid" autocomplete="off" spellcheck="false" placeholder="ffe1">
         </label>
-        <label>Device name prefix <span class="muted">(optional filter)</span>
-          <input name="bleNamePrefix" autocomplete="off" spellcheck="false" placeholder="e.g. BT05 — blank shows all devices">
+        <label>Device name filter
+          <input name="bleNamePrefix" autocomplete="off" spellcheck="false" placeholder="blank = show all nearby devices">
+        </label>
+        <p class="hint">Only devices whose name starts with this are listed (case-sensitive). AT-09 modules
+          are usually <code>BT05</code>; separate several with commas, e.g. <code>BT05, MLT-BT05</code>.
+          If you renamed the module with <code>AT+NAME</code>, enter the new name here.</p>
+        <label class="check">
+          <input type="checkbox" name="bleMatchService">
+          Also list any device advertising the service UUID
         </label>
         <p class="hint">16-bit (<code>ffe0</code>, <code>0xFFE0</code>) or full 128-bit UUIDs are accepted.
           Verify yours with the <a href="tools/ble-probe.html">BLE probe tool</a>.</p>

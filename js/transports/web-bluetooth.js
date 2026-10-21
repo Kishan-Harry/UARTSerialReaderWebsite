@@ -40,6 +40,50 @@ export function describeFilter(prefixes, matchService = false) {
   return parts.length ? `devices ${parts.join(' or ')}` : 'all nearby devices';
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** Shown when the GATT link can't be established after all retries. */
+export const CONNECT_FAILED_HINT =
+  'If BT05 is paired in Windows / Android Bluetooth settings, remove ("forget") it there — ' +
+  'the website connects directly and must not be paired. Also make sure no other phone or app is ' +
+  'connected to the module (LED blinking, not solid), then power-cycle it and try again.';
+
+/**
+ * gatt.connect() + primary-service lookup, retried.
+ *
+ * AT-09 / HM-10 clones (CC2541) frequently fail the first attempt — on Android
+ * this is the infamous GATT error 133, which surfaces as "NetworkError:
+ * Connection failed for unknown reason" or a link that drops right after
+ * connecting ("GATT Server is disconnected"). A short pause and another try
+ * almost always succeeds.
+ *
+ * Pass a service UUID to look up one service, or null to list all permitted ones.
+ * Throws NotFoundError unchanged so callers can report a wrong UUID.
+ */
+export async function connectGatt(device, service, { attempts = 4, onAttempt = () => {} } = {}) {
+  let lastErr;
+  for (let i = 1; i <= attempts; i++) {
+    onAttempt(i, attempts);
+    try {
+      const server = await device.gatt.connect();
+      // Let the module finish its connection-parameter update before discovery;
+      // querying immediately is a common cause of the instant drop.
+      await sleep(300);
+      if (!device.gatt.connected) throw new DOMException('GATT Server is disconnected.', 'NetworkError');
+      const services = service
+        ? [await server.getPrimaryService(service)]
+        : await server.getPrimaryServices().catch((e) => { if (e.name === 'NotFoundError') return []; throw e; });
+      return { server, services };
+    } catch (err) {
+      if (err.name === 'NotFoundError' && device.gatt.connected) throw err; // genuinely missing service
+      lastErr = err;
+      try { device.gatt.disconnect(); } catch { /* not connected */ }
+      if (i < attempts) await sleep(500 * i);
+    }
+  }
+  throw lastErr;
+}
+
 const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) ||
   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
@@ -101,23 +145,27 @@ export class WebBluetoothTransport extends Transport {
       return;
     }
 
-    this.device.addEventListener('gattserverdisconnected', this._onGattDisconnected);
     const name = this.device.name || 'device';
 
     try {
-      this._setStatus('connecting', `Connecting to ${name}…`);
-      const server = await this.device.gatt.connect();
-
       let svc;
       try {
-        svc = await server.getPrimaryService(service);
-      } catch {
-        throw new Error(`Service ${shortUuid(service)} not found on ${name}. Check the UUID with the BLE probe tool.`);
+        ({ services: [svc] } = await connectGatt(this.device, service, {
+          onAttempt: (i, n) => this._setStatus('connecting', i === 1 ? `Connecting to ${name}…` : `Connecting to ${name}… (retry ${i - 1} of ${n - 1})`),
+        }));
+      } catch (err) {
+        if (err.name === 'NotFoundError') {
+          throw new Error(`Service ${shortUuid(service)} not found on ${name}. Check the UUID with the BLE probe tool.`);
+        }
+        throw new Error(`Could not connect to ${name} (${err.message}). ${CONNECT_FAILED_HINT}`);
       }
+      // Attached only now so drops during the retry loop don't reset the UI.
+      this.device.addEventListener('gattserverdisconnected', this._onGattDisconnected);
 
       try {
         this.characteristic = await svc.getCharacteristic(characteristic);
-      } catch {
+      } catch (err) {
+        if (err.name !== 'NotFoundError') throw err;
         throw new Error(`Characteristic ${shortUuid(characteristic)} not found in service ${shortUuid(service)}.`);
       }
 

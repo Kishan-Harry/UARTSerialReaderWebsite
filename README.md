@@ -157,6 +157,7 @@ All paths are relative and there is no build step, so nothing else is needed. (`
 | *Port is in use* | Close the Arduino Serial Monitor or any other program using the COM port. |
 | All lines rejected / "no line terminator" | Baud rate mismatch — check Settings. |
 | First line after connecting rejected | Opening the port reset the board (DTR auto-reset); harmless. |
+| *Could not connect to BT05* (module listed, connect fails) | The module is paired in Windows / Android Bluetooth settings — remove it there; Web Bluetooth connects without pairing. Otherwise another phone/app holds the connection, or the module needs a power-cycle. The site already retries a few times to ride out Android's flaky first connect (GATT error 133). |
 | *Service ffe0 not found* | Your module uses different UUIDs — use the BLE probe tool and update Settings. |
 | Bluetooth chooser shows no devices (Android) | Turn on Bluetooth and Location, and grant Chrome the *Nearby devices* permission. |
 | Module missing from the chooser | Its name doesn't match the filter (check Settings, or open the BLE probe with a blank filter to see its real name), or another device is still connected to it. |

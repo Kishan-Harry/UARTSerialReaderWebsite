@@ -2,7 +2,7 @@
 // notifications, so the dashboard's UUIDs can be verified against real hardware.
 
 import { normalizeUuid, shortUuid } from '../js/transports/ble-uuid.js';
-import { parseNamePrefixes, buildRequestOptions } from '../js/transports/web-bluetooth.js';
+import { parseNamePrefixes, buildRequestOptions, connectGatt, CONNECT_FAILED_HINT } from '../js/transports/web-bluetooth.js';
 import { loadSettings, saveSettings } from '../js/ui/settings.js';
 
 const $ = (id) => document.getElementById(id);
@@ -79,18 +79,18 @@ $('scan').addEventListener('click', async () => {
   });
 
   try {
-    msg(`Connecting to ${device.name || device.id}…`);
-    const server = await device.gatt.connect();
+    const label = device.name || device.id;
+    let services;
+    try {
+      ({ services } = await connectGatt(device, null, {
+        onAttempt: (i, n) => msg(i === 1 ? `Connecting to ${label}…` : `Connecting to ${label}… (retry ${i - 1} of ${n - 1})`),
+      }));
+    } catch (e) {
+      throw new Error(`Could not connect (${e.message}). ${CONNECT_FAILED_HINT}`);
+    }
     $('disc').disabled = false;
     $('scan').disabled = true;
     log('info', `Connected to "${device.name || '(unnamed)'}" id=${device.id}`);
-
-    let services = [];
-    try {
-      services = await server.getPrimaryServices();
-    } catch (e) {
-      if (e.name !== 'NotFoundError') throw e;
-    }
     await render(services);
     msg(services.length
       ? `Found ${services.length} service(s) from your candidate list.`
